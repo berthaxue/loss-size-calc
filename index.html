@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0f1116">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="合约计算器">
+<link rel="manifest" href='data:application/manifest+json,{"name":"合约交易计算器","short_name":"合约计算器","display":"standalone","background_color":"#0f1116","theme_color":"#0f1116","start_url":"."}'>
+<title>合约交易计算器 · 收益 & 以损定仓</title>
+<style>
+  :root{
+    --bg:#0f1116; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a;
+    --txt:#e6e9ef; --sub:#9aa3b2; --muted:#6b7280;
+    --accent:#4f8cff; --accent2:#7c5cff;
+    --gain:#1faa59;  /* 涨/盈利 绿 (币圈习惯) */
+    --loss:#ff4d4f;  /* 跌/亏损 红 (币圈习惯) */
+    --warn:#ffb020;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:radial-gradient(1200px 600px at 80% -10%, #1b2233 0%, var(--bg) 55%);
+    color:var(--txt); min-height:100vh; padding:28px 16px 60px;
+  }
+  .wrap{max-width:760px;margin:0 auto}
+  header{text-align:center;margin-bottom:22px}
+  header h1{font-size:24px;font-weight:700;letter-spacing:.5px}
+  header p{color:var(--sub);font-size:13px;margin-top:6px}
+
+  .tabs{display:flex;gap:8px;background:var(--panel);padding:6px;border-radius:14px;margin-bottom:20px;border:1px solid var(--line)}
+  .tab{flex:1;text-align:center;padding:11px 8px;border-radius:10px;cursor:pointer;color:var(--sub);font-size:14px;font-weight:600;transition:.2s;user-select:none}
+  .tab.active{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 6px 18px rgba(79,140,255,.25)}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;display:none}
+  .card.active{display:block;animation:fade .25s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  .seg{display:flex;gap:8px;margin-bottom:18px}
+  .seg button{flex:1;padding:10px;border:1px solid var(--line);background:var(--panel2);color:var(--sub);border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;transition:.15s}
+  .seg button.on-l{background:rgba(31,170,89,.15);border-color:var(--gain);color:var(--gain)}   /* 做多=看涨=绿 */
+  .seg button.on-s{background:rgba(255,77,79,.15);border-color:var(--loss);color:var(--loss)}   /* 做空=看跌=红 */
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .field{display:flex;flex-direction:column;gap:6px;min-width:0}
+  .field.full{grid-column:1/-1}
+  label{font-size:12px;color:var(--sub)}
+  .inp{position:relative}
+  input{
+    width:100%;padding:12px 12px;background:var(--panel2);border:1px solid var(--line);
+    border-radius:10px;color:var(--txt);font-size:15px;outline:none;transition:.15s;font-variant-numeric:tabular-nums;
+  }
+  input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,140,255,.15)}
+  .inp .unit{position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:12px;pointer-events:none}
+
+  .res{margin-top:20px;border-top:1px dashed var(--line);padding-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .res .big{grid-column:1/-1;display:flex;gap:14px;flex-wrap:wrap}
+  .box{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0;overflow:hidden}
+  .box .k{font-size:12px;color:var(--sub);margin-bottom:6px}
+  .box .v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;word-break:break-word;line-height:1.25}
+  .box.grow{flex:1;min-width:0}
+  .pos{color:var(--gain)} .neg{color:var(--loss)} .neu{color:var(--txt)}
+
+  .tp-list{margin-top:8px;display:flex;flex-direction:column;gap:8px}
+  .tp-row{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;background:var(--bg);border:1px solid var(--line);border-radius:10px;min-width:0}
+  .tp-row .lbl{font-size:13px;color:var(--sub);white-space:nowrap}
+  .tp-row .v{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+  .note{font-size:11px;color:var(--muted);margin-top:14px;line-height:1.6}
+  .cta{text-align:center;margin-top:6px}
+  .reset{background:none;border:1px solid var(--line);color:var(--sub);padding:8px 16px;border-radius:10px;cursor:pointer;font-size:13px}
+  .reset:hover{border-color:var(--accent);color:var(--accent)}
+  @media(max-width:560px){.grid,.res{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>合约交易计算器</h1>
+    <p>收益测算 · 以损定仓 · 离线可用，输入即算</p>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="profit">💰 收益计算器</div>
+    <div class="tab" data-tab="risk">🛡️ 以损定仓计算器</div>
+  </div>
+
+  <!-- ===================== 收益计算器 ===================== -->
+  <section class="card active" id="profit">
+    <div class="seg" id="pDir">
+      <button data-d="long" class="on-l">做多（买涨）</button>
+      <button data-d="short">做空（买跌）</button>
+    </div>
+    <div class="grid">
+      <div class="field"><label>开仓价格</label><div class="inp"><input id="pOpen" type="number" placeholder="如 60000" step="any"><span class="unit">USDT</span></div></div>
+      <div class="field"><label>平仓价格</label><div class="inp"><input id="pClose" type="number" placeholder="如 63000" step="any"><span class="unit">USDT</span></div></div>
+      <div class="field"><label>开仓金额（USDT）</label><div class="inp"><input id="pAmt" type="number" placeholder="如 500" step="any"><span class="unit">USDT</span></div></div>
+      <div class="field"><label>杠杆倍数</label><div class="inp"><input id="pLev" type="number" value="1" min="1" step="any"><span class="unit">×</span></div></div>
+    </div>
+
+    <div class="res">
+      <div class="big">
+        <div class="box grow"><div class="k">预期收益额</div><div class="v neu" id="pPnl">—</div></div>
+        <div class="box grow"><div class="k">收益率（按保证金）</div><div class="v neu" id="pRoi">—</div></div>
+      </div>
+      <div class="box"><div class="k">占用保证金</div><div class="v neu" id="pMargin">—</div></div>
+      <div class="box"><div class="k">价格涨跌幅</div><div class="v neu" id="pChg">—</div></div>
+      <div class="box full"><div class="k">持仓数量（币）</div><div class="v neu" id="pQtyCoin">—</div></div>
+    </div>
+    <div class="cta"><button class="reset" data-reset="profit">清空重填</button></div>
+    <p class="note">收益额 = 开仓金额 × (平仓价 − 开仓价) ÷ 开仓价 × 方向；占用保证金 = 开仓金额 ÷ 杠杆；收益率 = 收益额 ÷ 占用保证金；持仓数量 = 开仓金额 ÷ 开仓价。做空时方向取反。涨/盈显示绿色，跌/亏显示红色（币圈习惯）。</p>
+  </section>
+
+  <!-- ===================== 以损定仓计算器 ===================== -->
+  <section class="card" id="risk">
+    <div class="seg" id="rDir">
+      <button data-d="long" class="on-l">做多（买涨）</button>
+      <button data-d="short">做空（买跌）</button>
+    </div>
+    <div class="grid">
+      <div class="field"><label>开单价格</label><div class="inp"><input id="rOpen" type="number" placeholder="如 60000" step="any"><span class="unit">USDT</span></div></div>
+      <div class="field"><label>止损价格</label><div class="inp"><input id="rStop" type="number" placeholder="如 58500" step="any"><span class="unit">USDT</span></div></div>
+      <div class="field"><label>最大承受止损金额</label><div class="inp"><input id="rLoss" type="number" placeholder="如 100" step="any"><span class="unit">USDT</span></div></div>
+      <div class="field"><label>手续费（单向 %）</label><div class="inp"><input id="rFee" type="number" value="0.05" step="any"><span class="unit">%</span></div></div>
+      <div class="field"><label>杠杆倍数</label><div class="inp"><input id="rLev" type="number" value="1" min="1" step="any"><span class="unit">×</span></div></div>
+      <div class="field"><label>账户总资金（可选）</label><div class="inp"><input id="rEquity" type="number" placeholder="如 1000" step="any"><span class="unit">USDT</span></div></div>
+    </div>
+
+    <div class="res">
+      <div class="box"><div class="k">占用保证金</div><div class="v neu" id="rMargin">—</div></div>
+      <div class="box"><div class="k">仓位名义金额</div><div class="v neu" id="rNotional">—</div></div>
+      <div class="box"><div class="k">预计手续费（开+平）</div><div class="v neu" id="rFeeAmt">—</div></div>
+      <div class="box"><div class="k">止损幅度</div><div class="v neu" id="rStopPct">—</div></div>
+
+      <div class="box full">
+        <div class="k">止盈目标价格（风险回报比）</div>
+        <div class="tp-list">
+          <div class="tp-row"><span class="lbl">1 : 1</span><span class="v neu" id="tp1">—</span></div>
+          <div class="tp-row"><span class="lbl">1.5 : 1</span><span class="v neu" id="tp15">—</span></div>
+          <div class="tp-row"><span class="lbl">2 : 1</span><span class="v neu" id="tp2">—</span></div>
+        </div>
+      </div>
+      <div class="box full" id="rEquityBox" style="display:none"><div class="k">该仓位占账户资金比例</div><div class="v neu" id="rEquityPct">—</div></div>
+    </div>
+    <div class="cta"><button class="reset" data-reset="risk">清空重填</button></div>
+    <p class="note">仓位数量 = 最大承受止损金额 ÷ |开单价 − 止损价|；仓位名义金额 = 数量 × 开单价；占用保证金 = 名义金额 ÷ 杠杆；预计手续费 = 名义金额 × 手续费率% × 2；止损幅度 = |开单价 − 止损价| ÷ 开单价。止盈目标按所选方向计算（做多在开单价上方、做空在下方）。本模块复刻自 loss-size-calc 工具并增加方向与杠杆。</p>
+  </section>
+</div>
+
+<script>
+function fmt(n, d=2){
+  if(!isFinite(n)) return '—';
+  return n.toLocaleString('en-US',{minimumFractionDigits:d, maximumFractionDigits:d});
+}
+function cls(n){ return n>0?'pos':(n<0?'neg':'neu'); }
+function sign(n){ return n>0?'+':''; }
+
+// 方向状态
+const dir = { profit:'long', risk:'long' };
+
+// 切换 tab
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.card').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById(t.dataset.tab).classList.add('active');
+  });
+});
+// 方向切换
+document.getElementById('pDir').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  dir.profit=b.dataset.d;
+  document.querySelectorAll('#pDir button').forEach(x=>{
+    x.classList.remove('on-l','on-s');
+    if(x===b) x.classList.add(dir.profit==='long'?'on-l':'on-s');
+  });
+  calcProfit();
+});
+document.getElementById('rDir').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  dir.risk=b.dataset.d;
+  document.querySelectorAll('#rDir button').forEach(x=>{
+    x.classList.remove('on-l','on-s');
+    if(x===b) x.classList.add(dir.risk==='long'?'on-l':'on-s');
+  });
+  calcRisk();
+});
+
+// 收益计算器（U 本位：开仓金额 = 名义价值 USDT）
+const pIds=['pOpen','pClose','pAmt','pLev'];
+pIds.forEach(id=>document.getElementById(id).addEventListener('input',calcProfit));
+function calcProfit(){
+  const o=+document.getElementById('pOpen').value;
+  const c=+document.getElementById('pClose').value;
+  const amt=+document.getElementById('pAmt').value;   // 开仓金额（名义价值, USDT）
+  const lev=+document.getElementById('pLev').value || 1;
+  const d = dir.profit==='long' ? 1 : -1;
+  const set=(id,v,cl)=>{const el=document.getElementById(id); el.textContent=v; el.className='v '+(cl||'neu');};
+  if(!o||!c||!amt){ set('pPnl','—');set('pRoi','—');set('pMargin','—');set('pChg','—');set('pQtyCoin','—'); return; }
+  const qty = amt / o;
+  const pnl = (c - o) * qty * d;
+  const margin = amt / lev;
+  const roi = margin ? pnl/margin : 0;
+  const chg = o ? (c - o)/o * d * 100 : 0;
+  set('pPnl', sign(pnl)+fmt(pnl)+' USDT', cls(pnl));
+  set('pRoi', sign(roi)+fmt(roi*100)+'%', cls(pnl));
+  set('pMargin', fmt(margin)+' USDT');
+  set('pChg', sign(chg)+fmt(chg)+'%', cls((c-o)*d));
+  set('pQtyCoin', fmt(qty,6));
+}
+
+// 以损定仓计算器
+const rIds=['rOpen','rStop','rLoss','rFee','rLev','rEquity'];
+rIds.forEach(id=>document.getElementById(id).addEventListener('input',calcRisk));
+function calcRisk(){
+  const o=+document.getElementById('rOpen').value;
+  const s=+document.getElementById('rStop').value;
+  const loss=+document.getElementById('rLoss').value;
+  const feePct=+document.getElementById('rFee').value || 0;
+  const lev=+document.getElementById('rLev').value || 1;
+  const equity=+document.getElementById('rEquity').value;
+  const d = dir.risk==='long' ? 1 : -1;
+  const set=(id,v,cl)=>{const el=document.getElementById(id); el.textContent=v; el.className='v '+(cl||'neu');};
+  if(!o||!s||!loss){ set('rMargin','—');set('rNotional','—');set('rFeeAmt','—');set('rStopPct','—');set('tp1','—');set('tp15','—');set('tp2','—'); document.getElementById('rEquityBox').style.display='none'; return; }
+  const diff = Math.abs(o - s);
+  const qty = diff? loss/diff : 0;
+  const notional = qty * o;
+  const margin = notional / lev;
+  const feeAmt = notional * (feePct/100) * 2;
+  const stopPct = o? diff/o*100 : 0;
+  // 止盈目标：做多上方、做空下方
+  const r = (o - s) * d; // 正向风险距离（正数）
+  set('rMargin', fmt(margin)+' USDT');
+  set('rNotional', fmt(notional)+' USDT');
+  set('rFeeAmt', fmt(feeAmt)+' USDT');
+  set('rStopPct', '−'+fmt(stopPct)+'%', 'neg');
+  set('tp1', fmt(o + r*1));
+  set('tp15', fmt(o + r*1.5));
+  set('tp2', fmt(o + r*2));
+  if(equity){
+    document.getElementById('rEquityBox').style.display='block';
+    set('rEquityPct', fmt(margin/equity*100)+'%');
+  } else {
+    document.getElementById('rEquityBox').style.display='none';
+  }
+}
+
+// 重置
+document.querySelectorAll('.reset').forEach(b=>{
+  b.addEventListener('click',()=>{
+    const which=b.dataset.reset;
+    if(which==='profit'){ pIds.forEach(id=>document.getElementById(id).value=''); document.getElementById('pLev').value='1'; calcProfit(); }
+    else { rIds.forEach(id=>document.getElementById(id).value=''); document.getElementById('rFee').value='0.05'; document.getElementById('rLev').value='1'; calcRisk(); }
+  });
+});
+
+// 初始算一遍
+calcProfit(); calcRisk();
+</script>
+</body>
+</html>
