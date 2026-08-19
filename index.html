@@ -81,12 +81,12 @@
   </header>
 
   <div class="tabs">
-    <div class="tab active" data-tab="profit">💰 收益计算器</div>
-    <div class="tab" data-tab="risk">🛡️ 以损定仓计算器</div>
+    <div class="tab" data-tab="profit">💰 收益计算器</div>
+    <div class="tab active" data-tab="risk">🛡️ 以损定仓计算器</div>
   </div>
 
   <!-- ===================== 收益计算器 ===================== -->
-  <section class="card active" id="profit">
+  <section class="card" id="profit">
     <div class="seg" id="pDir">
       <button data-d="long" class="on-l">做多（买涨）</button>
       <button data-d="short">做空（买跌）</button>
@@ -112,7 +112,7 @@
   </section>
 
   <!-- ===================== 以损定仓计算器 ===================== -->
-  <section class="card" id="risk">
+  <section class="card active" id="risk">
     <div class="seg" id="rDir">
       <button data-d="long" class="on-l">做多（买涨）</button>
       <button data-d="short">做空（买跌）</button>
@@ -244,6 +244,12 @@ function calcRisk(){
   } else {
     document.getElementById('rEquityBox').style.display='none';
   }
+  // 同步到收益计算器：开单价格 → 开仓价格，仓位名义金额 → 开仓金额
+  // 注意：收益计算器的输入框是 type=number，不能直接填入带千分位逗号的文本，故用纯数值
+  const pOpen=document.getElementById('pOpen'), pAmt=document.getElementById('pAmt');
+  if(pOpen.value!==String(o)) pOpen.value=o;
+  if(pAmt.value!==String(notional)) pAmt.value=notional;
+  calcProfit();
 }
 
 // 重置
